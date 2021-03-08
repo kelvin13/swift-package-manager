@@ -86,7 +86,7 @@ public protocol ManifestLoaderProtocol {
     ///   - on: The dispatch queue to perform asynchronous operations on.
     ///   - completion: The completion handler .
     func load(
-        at path: AbsolutePath,
+        manifestPath path: AbsolutePath,
         packageKind: PackageReference.Kind,
         packageLocation: String,
         version: Version?,
@@ -163,7 +163,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
     ///     - swiftCompiler: The absolute path of a `swiftc` executable.
     ///         Its associated resources will be used by the loader.
     public static func loadManifest(
-        at path: AbsolutePath,
+        manifestPath path: AbsolutePath, 
         kind: PackageReference.Kind,
         swiftCompiler: AbsolutePath,
         swiftCompilerFlags: [String],
@@ -175,9 +175,9 @@ public final class ManifestLoader: ManifestLoaderProtocol {
             let fileSystem = localFileSystem
             let resources = try UserManifestResources(swiftCompiler: swiftCompiler, swiftCompilerFlags: swiftCompilerFlags)
             let loader = ManifestLoader(manifestResources: resources)
-            let toolsVersion = try ToolsVersionLoader().load(at: path, fileSystem: fileSystem)
+            let toolsVersion = try ToolsVersionLoader().load(manifestPath: path, fileSystem: fileSystem)
             loader.load(
-                at: path,
+                manifestPath: path,
                 packageKind: kind,
                 packageLocation: path.pathString,
                 version: nil,
@@ -195,7 +195,7 @@ public final class ManifestLoader: ManifestLoaderProtocol {
     }
 
     public func load(
-        at path: AbsolutePath,
+        manifestPath path: AbsolutePath,
         packageKind: PackageReference.Kind,
         packageLocation: String,
         version: Version?,
@@ -208,9 +208,8 @@ public final class ManifestLoader: ManifestLoaderProtocol {
         completion: @escaping (Result<Manifest, Error>) -> Void
     ) {
         do {
-            let manifestPath = try Manifest.path(atPackagePath: path, fileSystem: fileSystem)
             let packageIdentity = identityResolver.resolveIdentity(for: packageLocation)
-            self.loadFile(at: manifestPath,
+            self.loadFile(at: path,
                           packageIdentity: packageIdentity,
                           packageKind: packageKind,
                           packageLocation: packageLocation,

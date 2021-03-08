@@ -132,6 +132,10 @@ public struct SwiftToolOptions: ParsableArguments {
     @Option(name: .shortAndLong, help: "Build with configuration")
     var configuration: BuildConfiguration = .debug
 
+    /// The custom manifest directory, if provided.
+    @Option(help: "Specify subdirectory containing `Package.swift`")
+    var manifestPrefix: AbsolutePath?
+
     /// The custom build directory, if provided.
     @Option(help: "Specify build/cache directory")
     var buildPath: AbsolutePath?

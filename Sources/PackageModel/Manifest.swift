@@ -16,12 +16,66 @@ import Foundation
 /// This contains the declarative specification loaded from package manifest
 /// files, and the tools for working with the manifest.
 public final class Manifest: ObjectIdentifierProtocol {
+    public static 
+    func filename(version: String? = nil) -> String
+    {
+        "Package\(version ?? "").swift"
+    }
+    
+    private static 
+    let filepattern = try! RegEx(pattern: "^\(filename(version: #"@swift-(\d+)(?:\.(\d+))?(?:\.(\d+))?"#))$")
+    
+    /* public static 
+    func manifestDirectory(packagePath: AbsolutePath, prefix: RelativePath?) -> AbsolutePath 
+    {
+        if let prefix: RelativePath = prefix {
+            return packagePath.appending(prefix)
+        } else {
+            return packagePath 
+        }
+    }
+    
+    public static 
+    func manifestPath(packagePath: AbsolutePath, prefix: RelativePath?, version: String? = nil) -> AbsolutePath 
+    {
+        manifestDirectory(packagePath: packagePath, prefix: prefix).appending(
+            component: filename(version: version))
+    }
+     */
+    public static 
+    func match(filename name: String) -> ToolsVersion?? {
+        // the old implementation only checked for files that start with 
+        // 'Package@' and end with 'swift'. files like 'Package@foo.swift' are 
+        // not manifest files, according to the rest of the pm tool, so we only 
+        // match manifest files that actually have the form of a version-specific 
+        // manifest file 
+        if name == filename()
+        {
+            return .some(nil)
+        }
+        
+        let parsedVersion = filepattern.matchGroups(in: name)
+        guard parsedVersion.count == 1, parsedVersion[0].count == 3, 
+            let major = Int(parsedVersion[0][0]) else {
+            return nil
+        }
+        
+        let minor = Int(parsedVersion[0][1]) ?? 0
+        let patch = Int(parsedVersion[0][2]) ?? 0
 
-    /// The standard filename for the manifest.
-    public static let filename = basename + ".swift"
-
-    /// The standard basename for the manifest.
-    public static let basename = "Package"
+        return ToolsVersion(version: Version(major, minor, patch))
+    }
+    
+    public static 
+    func match(filePath: AbsolutePath, manifestPath: AbsolutePath) 
+        -> ToolsVersion?? {
+        guard filePath.parentDirectory == manifestPath.parentDirectory
+        else {
+            return nil
+        }
+        return match(filename: filePath.basename) 
+    } 
+    
 
     /// FIXME: deprecate this, there is no value in this once we have real package identifiers
     /// The name of the package.

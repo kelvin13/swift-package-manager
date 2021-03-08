@@ -55,7 +55,7 @@ extension PackageGraph {
         let rootDependencies = Set(root.dependencies.compactMap{
             manifestMap[$0.identity]
         })
-        let rootManifestNodes = root.manifests.map { GraphLoadingNode(manifest: $0, productFilter: .everything) }
+        let rootManifestNodes = root.roots.map { GraphLoadingNode(manifest: $0.manifest, packagePath: $0.path, productFilter: .everything) }
         let rootDependencyNodes = root.dependencies.lazy.compactMap { (dependency: PackageDependencyDescription) -> GraphLoadingNode? in
             guard let manifest = manifestMap[dependency.identity] else { return nil }
             return GraphLoadingNode(manifest: manifest, productFilter: dependency.productFilter)
@@ -98,7 +98,12 @@ extension PackageGraph {
             // Derive the path to the package.
             //
             // FIXME: Lift this out of the manifest.
-            let packagePath = manifest.path.parentDirectory
+            // NOTE: package path is now stored in the GraphLoadingNode, but 
+            // is only available as an optional. we do not know the package path 
+            // for the external manifests, or the dependencies yet, so we 
+            // have to continue assuming the package path is the immediate parent 
+            // directory of the manifest file.
+            let packagePath = node.packagePath ?? manifest.path.parentDirectory
 
             let packageLocation = PackageLocation.Local(name: manifest.name, packagePath: packagePath)
             diagnostics.with(location: packageLocation) { diagnostics in
@@ -106,6 +111,7 @@ extension PackageGraph {
                     // Create a package from the manifest and sources.
                     let builder = PackageBuilder(
                         manifest: manifest,
+                        manifestPath: manifest.path, 
                         productFilter: node.productFilter,
                         path: packagePath,
                         additionalFileRules: additionalFileRules,

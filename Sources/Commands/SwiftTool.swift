@@ -252,27 +252,30 @@ public class SwiftTool {
     var options: SwiftToolOptions
 
     /// Path to the root package directory, nil if manifest is not found.
-    let packageRoot: AbsolutePath?
+    let packagePath:(root: AbsolutePath, manifest: AbsolutePath)?
 
     /// Helper function to get package root or throw error if it is not found.
     func getPackageRoot() throws -> AbsolutePath {
-        guard let packageRoot = packageRoot else {
+        guard let packageRoot = packagePath?.root else {
             throw Error.rootManifestFileNotFound
         }
         return packageRoot
     }
+    func getManifestPath() throws -> AbsolutePath {
+        guard let manifestPath = packagePath?.manifest else {
+            throw Error.rootManifestFileNotFound
+        }
+        return manifestPath
+    }
 
     /// Get the current workspace root object.
     func getWorkspaceRoot() throws -> PackageGraphRootInput {
-        let packages: [AbsolutePath]
-
         if let workspace = options.multirootPackageDataFile {
-            packages = try XcodeWorkspaceLoader(diagnostics: diagnostics).load(workspace: workspace)
+            return PackageGraphRootInput(packages: 
+                try XcodeWorkspaceLoader(diagnostics: diagnostics).load(workspace: workspace))
         } else {
-            packages = [try getPackageRoot()]
+            return PackageGraphRootInput(packages: [(try getPackageRoot(), try getManifestPath())])
         }
-
-        return PackageGraphRootInput(packages: packages)
     }
 
     /// Path to the build directory.
@@ -372,12 +375,15 @@ public class SwiftTool {
 
         // Create local variables to use while finding build path to avoid capture self before init error.
         let customBuildPath = options.buildPath
-        let packageRoot = findPackageRoot()
-
-        self.packageRoot = packageRoot
+        
+        // the option parser only lets the user specify an absolute path, so we assume 
+        // the manifest prefix is relative to the current working directory 
+        let packagePath = findPackageRoot(manifestPrefix: options.manifestPrefix?.relative(to: cwd))
+         
+        self.packagePath = packagePath 
         self.buildPath = getEnvBuildPath(workingDir: cwd) ??
             customBuildPath ??
-            (packageRoot ?? cwd).appending(component: ".build")
+            (packagePath?.root ?? cwd).appending(component: ".build")
         
         // Setup the globals.
         verbosity = Verbosity(rawValue: options.verbosity)
@@ -577,6 +583,7 @@ public class SwiftTool {
             // Fetch and load the package graph.
             let graph = try workspace.loadPackageGraph(
                 rootInput: getWorkspaceRoot(),
+                //rootManifestPath: getManifestPath(), 
                 explicitProduct: explicitProduct,
                 createMultipleTestProducts: createMultipleTestProducts,
                 createREPLProduct: createREPLProduct,
@@ -849,19 +856,28 @@ public class SwiftTool {
 
 /// Returns path of the nearest directory containing the manifest file w.r.t
 /// current working directory.
-private func findPackageRoot() -> AbsolutePath? {
+private func findPackageRoot(manifestPrefix: RelativePath?) -> (root:AbsolutePath, manifest:AbsolutePath)? {
     guard var root = localFileSystem.currentWorkingDirectory else {
         return nil
     }
     // FIXME: It would be nice to move this to a generalized method which takes path and predicate and
     // finds the lowest path for which the predicate is true.
-    while !localFileSystem.isFile(root.appending(component: Manifest.filename)) {
-        root = root.parentDirectory
-        guard !root.isRoot else {
-            return nil
+    while true
+    {
+        let manifestPath: AbsolutePath
+        if let prefix = manifestPrefix {
+            manifestPath = root.appending(prefix).appending(component: Manifest.filename())
+        } else {
+            manifestPath = root.appending(component: Manifest.filename())
         }
+        if localFileSystem.isFile(manifestPath) {
+            return (root, manifestPath)
+        }
+        else if root.isRoot {
+            return nil 
+        }
+        root = root.parentDirectory
     }
-    return root
 }
 
 /// Returns the build path from the environment, if present.

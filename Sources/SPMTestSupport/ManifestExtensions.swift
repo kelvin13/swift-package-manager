@@ -31,7 +31,7 @@ public extension Manifest {
     ) -> Manifest {
         return Manifest(
             name: name,
-            path: AbsolutePath(path).appending(component: Manifest.filename),
+            path: AbsolutePath(path).appending(component: Manifest.filename()),
             packageKind: packageKind,
             packageLocation: packageLocation,
             platforms: [],
@@ -68,7 +68,7 @@ public extension Manifest {
     ) -> Manifest {
         return Manifest(
             name: name,
-            path: AbsolutePath(path).appending(component: Manifest.filename),
+            path: AbsolutePath(path).appending(component: Manifest.filename()),
             packageKind: packageKind,
             packageLocation: packageLocation,
             defaultLocalization: defaultLocalization,

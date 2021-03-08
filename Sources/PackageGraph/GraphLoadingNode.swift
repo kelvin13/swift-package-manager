@@ -22,12 +22,15 @@ public struct GraphLoadingNode: Equatable, Hashable {
 
     /// The package manifest.
     public let manifest: Manifest
+    
+    public let packagePath: AbsolutePath?
 
     /// The product filter applied to the package.
     public let productFilter: ProductFilter
 
-    public init(manifest: Manifest, productFilter: ProductFilter) {
+    public init(manifest: Manifest, packagePath: AbsolutePath? = nil, productFilter: ProductFilter) {
         self.manifest = manifest
+        self.packagePath = packagePath
         self.productFilter = productFilter
     }
 

@@ -67,7 +67,7 @@ public final class XcodeWorkspaceLoader {
                 path = AbsolutePath(location.path, relativeTo: workspace.parentDirectory)
             }
 
-            if fs.exists(path.appending(component: Manifest.filename)) {
+            if fs.exists(path.appending(component: Manifest.filename())) {
                 result.append(path)
             } else {
                 diagnostics.emit(warning: "ignoring non-package fileref \(path)")

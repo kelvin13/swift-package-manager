@@ -18,12 +18,11 @@ import TSCUtility
 /// - Parameters:
 ///   - path: The path of the package.
 ///   - version: The version to write.
-public func writeToolsVersion(at path: AbsolutePath, version: ToolsVersion, fs: FileSystem) throws {
-    let file = path.appending(component: Manifest.filename)
-    assert(fs.isFile(file), "Tools version file not present")
+public func writeToolsVersion(manifestPath: AbsolutePath, version: ToolsVersion, fs: FileSystem) throws {
+    assert(fs.isFile(manifestPath), "Tools version file not present")
 
     /// The current contents of the file.
-    let contents = try fs.readFileContents(file)
+    let contents = try fs.readFileContents(manifestPath)
 
     let stream = BufferedOutputByteStream()
     // Write out the tools version.
@@ -37,7 +36,7 @@ public func writeToolsVersion(at path: AbsolutePath, version: ToolsVersion, fs: 
     // The following lines up to line 54 append the file contents except for the Swift tools version specification line.
     
     guard let contentsDecodedWithUTF8 = contents.validDescription else {
-        throw ToolsVersionLoader.Error.nonUTF8EncodedManifest(path: file)
+        throw ToolsVersionLoader.Error.nonUTF8EncodedManifest(path: manifestPath)
     }
     
     let manifestComponents = ToolsVersionLoader.split(contentsDecodedWithUTF8)
@@ -52,5 +51,5 @@ public func writeToolsVersion(at path: AbsolutePath, version: ToolsVersion, fs: 
         stream <<< contents
     }
 
-    try fs.writeFileContents(file, bytes: stream.bytes)
+    try fs.writeFileContents(manifestPath, bytes: stream.bytes)
 }

@@ -148,7 +148,7 @@ public class RepositoryPackageContainer: PackageContainer, CustomStringConvertib
             }
             let revision = try repository.resolveRevision(tag: tag)
             let fs = try repository.openFileView(revision: revision)
-            return try toolsVersionLoader.load(at: .root, fileSystem: fs)
+            return try toolsVersionLoader.load(manifestPath: .root, fileSystem: fs)
         }
     }
 
@@ -272,7 +272,7 @@ public class RepositoryPackageContainer: PackageContainer, CustomStringConvertib
             let packageLocation = package.repository.url
 
             // Load the tools version.
-            let toolsVersion = try toolsVersionLoader.load(at: .root, fileSystem: fs)
+            let toolsVersion = try toolsVersionLoader.load(manifestPath: .root, fileSystem: fs)
 
             // Validate the tools version.
             try toolsVersion.validateToolsVersion(
@@ -281,7 +281,7 @@ public class RepositoryPackageContainer: PackageContainer, CustomStringConvertib
             // Load the manifest.
             // FIXME: this should not block
             return try temp_await {
-                manifestLoader.load(at: AbsolutePath.root,
+                manifestLoader.load(manifestPath: AbsolutePath.root,
                                     packageKind: package.kind,
                                     packageLocation: packageLocation,
                                     version: version,

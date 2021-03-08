@@ -24,7 +24,7 @@ public protocol ToolsVersionLoaderProtocol {
     ///   - fileSystem: The file system to use to read the file which contains tools version.
     /// - Returns: The tools version.
     /// - Throws: ToolsVersion.Error
-    func load(at path: AbsolutePath, fileSystem: FileSystem) throws -> ToolsVersion
+    func load(manifestPath: AbsolutePath, fileSystem: FileSystem) throws -> ToolsVersion
 }
 
 extension Manifest {
@@ -33,13 +33,21 @@ extension Manifest {
     /// Version specific manifest is chosen if present, otherwise path to regular
     /// manifest is returned.
     public static func path(
-        atPackagePath packagePath: AbsolutePath,
+        atPackagePath packagePath: AbsolutePath, 
+        prefix: RelativePath?,
         currentToolsVersion: ToolsVersion = .currentToolsVersion,
         fileSystem: FileSystem
     ) throws -> AbsolutePath {
+        let directory: AbsolutePath 
+        if let prefix = prefix {
+            directory = packagePath.appending(prefix)
+        } else {
+            directory = packagePath 
+        }
+        
         // Look for a version-specific manifest.
         for versionSpecificKey in SwiftVersion.currentVersion.versionSpecificKeys {
-            let versionSpecificPath = packagePath.appending(component: Manifest.basename + versionSpecificKey + ".swift")
+            let versionSpecificPath = directory.appending(component: filename(version: versionSpecificKey))
             if fileSystem.isFile(versionSpecificPath) {
                 return versionSpecificPath
             }
@@ -48,36 +56,26 @@ extension Manifest {
         // Otherwise, check if there is a version-specific manifest that has
         // a higher tools version than the main Package.swift file.
         let contents: [String]
-        do { contents = try fileSystem.getDirectoryContents(packagePath) } catch {
-            throw ToolsVersionLoader.Error.inaccessiblePackage(path: packagePath, reason: String(describing: error))
+        do { contents = try fileSystem.getDirectoryContents(directory) } catch {
+            throw ToolsVersionLoader.Error.inaccessiblePackage(path: directory, reason: String(describing: error))
         }
-        let regex = try! RegEx(pattern: #"^Package@swift-(\d+)(?:\.(\d+))?(?:\.(\d+))?.swift$"#)
-
+        
         // Collect all version-specific manifests at the given package path.
-        let versionSpecificManifests = Dictionary(contents.compactMap{ file -> (ToolsVersion, String)? in
-            let parsedVersion = regex.matchGroups(in: file)
-            guard parsedVersion.count == 1, parsedVersion[0].count == 3 else {
-                return nil
-            }
+        let versionSpecificManifests = contents.compactMap{ file -> (ToolsVersion, String)? in
+            (Manifest.match(filename: file) ?? nil).map{ ($0, file) } 
+        }
 
-            let major = Int(parsedVersion[0][0])!
-            let minor = parsedVersion[0][1].isEmpty ? 0 : Int(parsedVersion[0][1])!
-            let patch = parsedVersion[0][2].isEmpty ? 0 : Int(parsedVersion[0][2])!
-
-            return (ToolsVersion(version: Version(major, minor, patch)), file)
-        }, uniquingKeysWith: { $1 })
-
-        let regularManifest = packagePath.appending(component: filename)
+        let regularManifest = directory.appending(component: filename())
         let toolsVersionLoader = ToolsVersionLoader(currentToolsVersion: currentToolsVersion)
 
         // Find the newest version-specific manifest that is compatible with the the current tools version.
-        if let versionSpecificCandidate = versionSpecificManifests.keys.sorted(by: >).first(where: { $0 <= currentToolsVersion }) {
-            let versionSpecificManifest = packagePath.appending(component: versionSpecificManifests[versionSpecificCandidate]!)
+        if let (version, file) = versionSpecificManifests.sorted(by: >).first(where: { $0.0 <= currentToolsVersion }) {
+            let versionSpecificManifest = directory.appending(component: file)
             
             // SwiftPM 4 introduced tools-version designations; earlier packages default to tools version 3.1.0.
             // See https://swift.org/blog/swift-package-manager-manifest-api-redesign.
             let versionSpecificManifestToolsVersion: ToolsVersion
-            if versionSpecificCandidate < .v4 {
+            if version < .v4 {
                 versionSpecificManifestToolsVersion = .v3
             }
             else {
@@ -327,15 +325,13 @@ public struct ToolsVersionLoader: ToolsVersionLoaderProtocol {
         }
     }
 
-    public func load(at path: AbsolutePath, fileSystem: FileSystem) throws -> ToolsVersion {
-        // The file which contains the tools version.
-        let file = try Manifest.path(atPackagePath: path, currentToolsVersion: currentToolsVersion, fileSystem: fileSystem)
-        guard fileSystem.isFile(file) else {
+    public func load(manifestPath: AbsolutePath, fileSystem: FileSystem) throws -> ToolsVersion {
+        guard fileSystem.isFile(manifestPath) else {
             // FIXME: We should return an error from here but Workspace tests rely on this in order to work.
             // This doesn't really cause issues (yet) in practice though.
             return ToolsVersion.currentToolsVersion
         }
-        return try load(file: file, fileSystem: fileSystem)
+        return try load(file: manifestPath, fileSystem: fileSystem)
     }
 
     // FIXME: Using "file" as the parameter name (and label) sounds wrong in some subsequent use of it in the function body.

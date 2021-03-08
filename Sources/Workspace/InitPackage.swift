@@ -55,6 +55,8 @@ public final class InitPackage {
 
     /// Where to create the new package
     let destinationPath: AbsolutePath
+    
+    let manifestPath: AbsolutePath
 
     /// The type of package to create.
     var packageType: PackageType { options.packageType }
@@ -77,11 +79,13 @@ public final class InitPackage {
     public convenience init(
         name: String,
         destinationPath: AbsolutePath,
+        manifestPath: AbsolutePath, 
         packageType: PackageType
     ) throws {
         try self.init(
             name: name,
             destinationPath: destinationPath,
+            manifestPath: manifestPath, 
             options: InitPackageOptions(packageType: packageType)
         )
     }
@@ -90,10 +94,12 @@ public final class InitPackage {
     public init(
         name: String,
         destinationPath: AbsolutePath,
+        manifestPath: AbsolutePath, 
         options: InitPackageOptions
     ) throws {
         self.options = options
         self.destinationPath = destinationPath
+        self.manifestPath = manifestPath
         self.pkgname = name
         self.moduleName = name.spm_mangledToC99ExtendedIdentifier()
     }
@@ -123,12 +129,11 @@ public final class InitPackage {
     }
 
     private func writeManifestFile() throws {
-        let manifest = destinationPath.appending(component: Manifest.filename)
-        guard localFileSystem.exists(manifest) == false else {
+        guard localFileSystem.exists(manifestPath) == false else {
             throw InitError.manifestAlreadyExists
         }
 
-        try writePackageFile(manifest) { stream in
+        try writePackageFile(manifestPath) { stream in
             stream <<< """
                 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
@@ -227,7 +232,7 @@ public final class InitPackage {
 
         // Write the current tools version.
         try writeToolsVersion(
-            at: manifest.parentDirectory, version: version, fs: localFileSystem)
+            manifestPath: manifestPath, version: version, fs: localFileSystem)
     }
 
     private func writeREADMEFile() throws {

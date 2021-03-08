@@ -39,7 +39,7 @@ public final class LocalPackageContainer: PackageContainer {
     private func loadManifest() throws -> Manifest {
         try manifest.memoize() {
             // Load the tools version.
-            let toolsVersion = try toolsVersionLoader.load(at: AbsolutePath(package.location), fileSystem: fileSystem)
+            let toolsVersion = try toolsVersionLoader.load(manifestPath: AbsolutePath(package.location).appending(component: Manifest.filename()), fileSystem: fileSystem)
 
             // Validate the tools version.
             try toolsVersion.validateToolsVersion(self.currentToolsVersion, packagePath: package.location)
@@ -47,7 +47,7 @@ public final class LocalPackageContainer: PackageContainer {
             // Load the manifest.
             // FIXME: this should not block
             return try temp_await {
-                manifestLoader.load(at: AbsolutePath(package.location),
+                manifestLoader.load(manifestPath: AbsolutePath(package.location).appending(component: Manifest.filename()),
                                     packageKind: package.kind,
                                     packageLocation: package.location,
                                     version: nil,

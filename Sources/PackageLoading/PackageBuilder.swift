@@ -217,6 +217,7 @@ public struct BinaryArtifact {
 public final class PackageBuilder {
     /// The manifest for the package being constructed.
     private let manifest: Manifest
+    private let manifestPath: AbsolutePath
 
     /// The product filter to apply to the package.
     private let productFilter: ProductFilter
@@ -266,6 +267,7 @@ public final class PackageBuilder {
     ///     each test target.
     public init(
         manifest: Manifest,
+        manifestPath: AbsolutePath,
         productFilter: ProductFilter,
         path: AbsolutePath,
         additionalFileRules: [FileRuleDescription] = [],
@@ -279,6 +281,7 @@ public final class PackageBuilder {
         createREPLProduct: Bool = false
     ) {
         self.manifest = manifest
+        self.manifestPath = manifestPath
         self.productFilter = productFilter
         self.packagePath = path
         self.additionalFileRules = additionalFileRules
@@ -301,6 +304,7 @@ public final class PackageBuilder {
     ///     - kind: The kind of package.
     public static func loadPackage(
         at path: AbsolutePath,
+        manifestPath: AbsolutePath, 
         kind: PackageReference.Kind = .root,
         swiftCompiler: AbsolutePath,
         swiftCompilerFlags: [String],
@@ -311,7 +315,7 @@ public final class PackageBuilder {
         on queue: DispatchQueue,
         completion: @escaping (Result<Package, Error>) -> Void
     ) {
-        ManifestLoader.loadManifest(at: path,
+        ManifestLoader.loadManifest(manifestPath: manifestPath,
                                     kind: kind,
                                     swiftCompiler: swiftCompiler,
                                     swiftCompilerFlags: swiftCompilerFlags,
@@ -319,7 +323,8 @@ public final class PackageBuilder {
                                     on: queue) { result in
             let result = result.tryMap { manifest -> Package in
                 let builder = PackageBuilder(
-                    manifest: manifest,
+                    manifest: manifest, 
+                    manifestPath: manifestPath,
                     productFilter: .everything,
                     path: path,
                     xcTestMinimumDeploymentTargets: xcTestMinimumDeploymentTargets,
@@ -402,15 +407,9 @@ public final class PackageBuilder {
         }
 
         // Ignore manifest files.
-        if path.parentDirectory == packagePath {
-            if basename == Manifest.filename { return false }
-
-            // Ignore version-specific manifest files.
-            if basename.hasPrefix(Manifest.basename + "@") && basename.hasSuffix(".swift") {
-                return false
-            }
+        if let _: ToolsVersion? = Manifest.match(filePath: path, manifestPath: manifestPath) {
+            return false 
         }
-
         // Otherwise, we have a valid source file.
         return true
     }
@@ -480,7 +479,6 @@ public final class PackageBuilder {
             throw ModuleError.invalidManifestConfig(
                 manifest.name, "the 'providers' property can only be used with a System Module Package")
         }
-
         return try constructV4Targets()
     }
 
@@ -768,7 +766,8 @@ public final class PackageBuilder {
 
         let sourcesBuilder = TargetSourcesBuilder(
             packageName: manifest.name,
-            packagePath: packagePath,
+            packagePath: packagePath, 
+            manifestPath: manifestPath,
             target: manifestTarget,
             path: potentialModule.path,
             defaultLocalization: manifest.defaultLocalization,

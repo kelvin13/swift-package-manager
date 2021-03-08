@@ -177,6 +177,7 @@ extension SwiftPackageTool {
 
             let builder = PackageBuilder(
                 manifest: manifest,
+                manifestPath: try swiftTool.getManifestPath(),
                 productFilter: .everything,
                 path: try swiftTool.getPackageRoot(),
                 xcTestMinimumDeploymentTargets: MinimumDeploymentTarget.default.xcTestMinimumDeploymentTargets,
@@ -203,10 +204,11 @@ extension SwiftPackageTool {
         func run(_ swiftTool: SwiftTool) throws {
             // FIXME: Error handling.
             let cwd = localFileSystem.currentWorkingDirectory!
-
+            
+            let manifestPath = (swiftOptions.manifestPrefix ?? cwd).appending(component: Manifest.filename())
             let packageName = self.packageName ?? cwd.basename
             let initPackage = try InitPackage(
-                name: packageName, destinationPath: cwd, packageType: initMode)
+                name: packageName, destinationPath: cwd, manifestPath: manifestPath, packageType: initMode)
             initPackage.progressReporter = { message in
                 print(message)
             }
@@ -242,7 +244,8 @@ extension SwiftPackageTool {
             }[0]
 
             let builder = PackageBuilder(
-                manifest: manifest,
+                manifest: manifest, 
+                manifestPath: try swiftTool.getManifestPath(), 
                 productFilter: .everything,
                 path: try swiftTool.getPackageRoot(),
                 xcTestMinimumDeploymentTargets: [:], // Minimum deployment target does not matter for this operation.
@@ -507,12 +510,12 @@ extension SwiftPackageTool {
         }
 
         func run(_ swiftTool: SwiftTool) throws {
-            let pkg = try swiftTool.getPackageRoot()
+            let manifestPath = try swiftTool.getManifestPath()
 
             switch toolsVersionMode {
             case .display:
                 let toolsVersionLoader = ToolsVersionLoader()
-                let version = try toolsVersionLoader.load(at: pkg, fileSystem: localFileSystem)
+                let version = try toolsVersionLoader.load(manifestPath: manifestPath, fileSystem: localFileSystem)
                 print("\(version)")
 
             case .set(let value):
@@ -520,14 +523,14 @@ extension SwiftPackageTool {
                     // FIXME: Probably lift this error defination to ToolsVersion.
                     throw ToolsVersionLoader.Error.malformedToolsVersionSpecification(.versionSpecifier(.isMisspelt(value)))
                 }
-                try writeToolsVersion(at: pkg, version: toolsVersion, fs: localFileSystem)
+                try writeToolsVersion(manifestPath: manifestPath, version: toolsVersion, fs: localFileSystem)
 
             case .setCurrent:
                 // Write the tools version with current version but with patch set to zero.
                 // We do this to avoid adding unnecessary constraints to patch versions, if
                 // the package really needs it, they can do it using --set option.
                 try writeToolsVersion(
-                    at: pkg, version: ToolsVersion.currentToolsVersion.zeroedPatch, fs: localFileSystem)
+                    manifestPath: manifestPath, version: ToolsVersion.currentToolsVersion.zeroedPatch, fs: localFileSystem)
             }
         }
     }
@@ -682,7 +685,7 @@ extension SwiftPackageTool {
                 try WatchmanHelper(
                     diagnostics: swiftTool.diagnostics,
                     watchmanScriptsDir: swiftTool.buildPath.appending(component: "watchman"),
-                    packageRoot: swiftTool.packageRoot!
+                    packageRoot: try swiftTool.getPackageRoot()
                 ).runXcodeprojWatcher(xcodeprojOptions())
             }
         }

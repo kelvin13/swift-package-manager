@@ -26,6 +26,8 @@ public struct TargetSourcesBuilder {
 
     /// The path of the package.
     public let packagePath: AbsolutePath
+    
+    public let manifestPath: AbsolutePath
 
     /// The path of the target.
     public let targetPath: AbsolutePath
@@ -52,6 +54,7 @@ public struct TargetSourcesBuilder {
     public init(
         packageName: String,
         packagePath: AbsolutePath,
+        manifestPath: AbsolutePath,
         target: TargetDescription,
         path: AbsolutePath,
         defaultLocalization: String?,
@@ -62,6 +65,7 @@ public struct TargetSourcesBuilder {
     ) {
         self.packageName = packageName
         self.packagePath = packagePath
+        self.manifestPath = manifestPath
         self.target = target
         self.defaultLocalization = defaultLocalization
         self.diags = diags
@@ -384,14 +388,8 @@ public struct TargetSourcesBuilder {
             }
 
             // Ignore manifest files.
-            if path.parentDirectory == packagePath {
-                if path.basename == Manifest.filename { continue }
-                if path.basename == "Package.resolved" { continue }
-
-                // Ignore version-specific manifest files.
-                if path.basename.hasPrefix(Manifest.basename + "@") && path.extension == "swift" {
-                    continue
-                }
+            if let _: ToolsVersion? = Manifest.match(filePath: path, manifestPath: manifestPath) {
+                continue
             }
 
             // Ignore if this is an excluded path.

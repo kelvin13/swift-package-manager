@@ -49,7 +49,7 @@ public final class MockManifestLoader: ManifestLoaderProtocol {
     }
 
     public func load(
-        at path: TSCBasic.AbsolutePath,
+        manifestPath path: TSCBasic.AbsolutePath,
         packageKind: PackageReference.Kind,
         packageLocation: String,
         version: Version?,
@@ -77,7 +77,7 @@ public final class MockManifestLoader: ManifestLoaderProtocol {
 
 extension ManifestLoader {
     public func load(
-        at path: TSCBasic.AbsolutePath,
+        manifestPath path: TSCBasic.AbsolutePath,
         packageKind: PackageModel.PackageReference.Kind,
         packageLocation: String,
         toolsVersion: PackageModel.ToolsVersion,
@@ -86,7 +86,7 @@ extension ManifestLoader {
         diagnostics: TSCBasic.DiagnosticsEngine? = nil
     ) throws -> Manifest{
         try tsc_await {
-            self.load(at: path,
+            self.load(manifestPath: path,
                       packageKind: packageKind,
                       packageLocation: packageLocation,
                       version: nil,

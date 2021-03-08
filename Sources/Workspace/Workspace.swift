@@ -642,6 +642,7 @@ extension Workspace {
     @discardableResult
     public func loadPackageGraph(
         rootInput root: PackageGraphRootInput,
+        //rootManifestPath: AbsolutePath, 
         explicitProduct: String? = nil,
         createMultipleTestProducts: Bool = false,
         createREPLProduct: Bool = false,
@@ -692,7 +693,8 @@ extension Workspace {
 
     @discardableResult
     public func loadPackageGraph(
-        rootPath: AbsolutePath,
+        rootPath: AbsolutePath, 
+        //rootManifestPath: AbsolutePath, 
         explicitProduct: String? = nil,
         diagnostics: DiagnosticsEngine
     ) throws -> PackageGraph {
@@ -719,16 +721,25 @@ extension Workspace {
 
     /// Loads and returns manifests at the given paths.
     public func loadRootManifests(
-        packages: [AbsolutePath],
+        packages: [(root:AbsolutePath, manifest:AbsolutePath)],
         diagnostics: DiagnosticsEngine,
         completion: @escaping(Result<[Manifest], Error>) -> Void
     ) {
         let lock = Lock()
         let sync = DispatchGroup()
         var rootManifests = [Manifest]()
-        Set(packages).forEach { package in
+        
+        var seen = Set<AbsolutePath>()
+        for package in packages 
+        {
+            if seen.contains(package.root) {
+                continue 
+            } else {
+                seen.insert(package.root)
+            }
+            
             sync.enter()
-            self.loadManifest(packagePath: package, packageLocation: package.pathString, packageKind: .root, diagnostics: diagnostics) { result in
+            self.loadManifest(packagePath: package.root, manifestPath: package.manifest, packageLocation: package.root.pathString, packageKind: .root, diagnostics: diagnostics) { result in
                 defer { sync.leave() }
                 if case .success(let manifest) = result {
                     lock.withLock {
@@ -823,6 +834,7 @@ extension Workspace {
             // FIXME: this should not block
             let manifest = try temp_await {
                 self.loadManifest(packagePath: destination,
+                                  manifestPath: destination.appending(component: Manifest.filename()),
                                   packageLocation: dependency.packageRef.repository.url,
                                   packageKind: .local,
                                   diagnostics: diagnostics,
@@ -1218,8 +1230,9 @@ extension Workspace {
     /// Returns manifest interpreter flags for a package.
     public func interpreterFlags(for packagePath: AbsolutePath) -> [String] {
         // We ignore all failures here and return empty array.
+        let manifestPath = packagePath.appending(component: Manifest.filename())
         guard let manifestLoader = self.manifestLoader as? ManifestLoader,
-              let toolsVersion = try? toolsVersionLoader.load(at: packagePath, fileSystem: fileSystem),
+              let toolsVersion = try? toolsVersionLoader.load(manifestPath: manifestPath, fileSystem: fileSystem),
               currentToolsVersion >= toolsVersion,
               toolsVersion >= ToolsVersion.minimumRequired else {
             return []
@@ -1344,6 +1357,7 @@ extension Workspace {
 
         // Load and return the manifest.
         self.loadManifest(packagePath: packagePath,
+                          manifestPath: packagePath.appending(component: Manifest.filename()),
                           packageLocation: managedDependency.packageRef.location,
                           version: version,
                           packageKind: packageKind,
@@ -1380,6 +1394,7 @@ extension Workspace {
     /// This is just a helper wrapper to the manifest loader.
     fileprivate func loadManifest(
         packagePath: AbsolutePath,
+        manifestPath: AbsolutePath,
         packageLocation: String,
         version: Version? = nil,
         packageKind: PackageReference.Kind,
@@ -1392,13 +1407,13 @@ extension Workspace {
         diagnostics.with(location: PackageLocation.Local(packagePath: packagePath)) { diagnostics in
             do {
                 // Load the tools version for the package.
-                let toolsVersion = try toolsVersionLoader.load(at: packagePath, fileSystem: fileSystem)
+                let toolsVersion = try toolsVersionLoader.load(manifestPath: manifestPath, fileSystem: fileSystem)
 
                 // Validate the tools version.
                 try toolsVersion.validateToolsVersion(currentToolsVersion, packagePath: packagePath.pathString)
 
                 // Load the manifest.
-                manifestLoader.load(at: packagePath,
+                manifestLoader.load(manifestPath: manifestPath,
                                     packageKind: packageKind,
                                     packageLocation: packageLocation,
                                     version: version,

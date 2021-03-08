@@ -17,15 +17,19 @@ import SourceControl
 /// Represents the input to the package graph root.
 public struct PackageGraphRootInput {
     /// The list of root packages.
-    public let packages: [AbsolutePath]
+    public let packages: [(root:AbsolutePath, manifest:AbsolutePath)]
 
     /// Top level dependencies to the graph.
     public let dependencies: [PackageDependencyDescription]
 
 
     /// Create a package graph root.
-    public init(packages: [AbsolutePath], dependencies: [PackageDependencyDescription] = []) {
+    public init(packages: [(root:AbsolutePath, manifest:AbsolutePath)], dependencies: [PackageDependencyDescription] = []) {
         self.packages = packages
+        self.dependencies = dependencies
+    }
+    public init(packages: [AbsolutePath], dependencies: [PackageDependencyDescription] = []) {
+        self.packages = packages.map{ ($0, $0.appending(component: Manifest.filename())) }
         self.dependencies = dependencies
     }
 }
@@ -34,7 +38,10 @@ public struct PackageGraphRootInput {
 public struct PackageGraphRoot {
 
     /// The list of root manifests.
-    public let manifests: [Manifest]
+    public let roots: [(path: AbsolutePath, manifest: Manifest)]
+    public var manifests: [Manifest] {
+        roots.map(\.manifest)
+    }
 
     /// The root package references.
     public let packageRefs: [PackageReference]
@@ -44,12 +51,15 @@ public struct PackageGraphRoot {
 
     /// Create a package graph root.
     public init(input: PackageGraphRootInput, manifests: [Manifest], explicitProduct: String? = nil) {
+        // FIXME: this seems a little smelly because the manifest loaders in 
+        // Workspace.swift skip duplicated inputs, so the zip might get staggered
+        
         // TODO: this does not use the identity resolver which is probably fine since its the root packages
         self.packageRefs = zip(input.packages, manifests).map { (path, manifest) in
             let identity = PackageIdentity(url: manifest.packageLocation)
-            return .root(identity: identity, path: path)
+            return .root(identity: identity, path: path.root)
         }
-        self.manifests = manifests
+        self.roots = zip(input.packages, manifests).map{ ($0.root, $1) }
 
         // FIXME: Deprecate special casing once the manifest supports declaring used executable products.
         // Special casing explicit products like this is necessary to pass the test suite and satisfy backwards compatibility.

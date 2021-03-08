@@ -112,13 +112,13 @@ public final class MockWorkspace {
                 try repo.writeFileContents(repoTargetDir.appending(component: "file.swift"), bytes: "")
             }
             let toolsVersion = package.toolsVersion ?? .currentToolsVersion
-            let repoManifestPath = AbsolutePath.root.appending(component: Manifest.filename)
+            let repoManifestPath = AbsolutePath.root.appending(component: Manifest.filename())
             try repo.writeFileContents(repoManifestPath, bytes: "")
-            try writeToolsVersion(at: .root, version: toolsVersion, fs: repo)
+            try writeToolsVersion(manifestPath: repoManifestPath, version: toolsVersion, fs: repo)
             try repo.commit()
 
             let versions: [String?] = packageKind == .remote ? package.versions : [nil]
-            let manifestPath = packagePath.appending(component: Manifest.filename)
+            let manifestPath = packagePath.appending(component: Manifest.filename())
             for version in versions {
                 let v = version.flatMap(Version.init(string:))
                 manifests[.init(url: packageLocation, version: v)] = Manifest(
